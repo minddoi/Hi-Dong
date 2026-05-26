@@ -76,27 +76,13 @@ struct HistoryView: View {
 
 private struct ExpenseRow: View {
     let item: ExpenseItem
-    private let storage = ImageStorageService()
-    @State private var thumbnail: UIImage?
 
     var body: some View {
         HStack(spacing: 14) {
-            // 누끼 썸네일
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(.systemGray6))
-                    .frame(width: 54, height: 54)
-                if let thumbnail {
-                    Image(uiImage: thumbnail)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 54, height: 54)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                } else {
-                    Text(item.category.emoji)
-                        .font(.title2)
-                }
-            }
+            // 누끼 썸네일 (공용 컴포넌트 — 내부적으로 shared storage 사용)
+            SubjectImageView(item: item)
+                .frame(width: 54, height: 54)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.name)
@@ -116,9 +102,5 @@ private struct ExpenseRow: View {
                 .font(.body.weight(.semibold))
         }
         .padding(.vertical, 4)
-        .task {
-            guard let path = item.imagePath else { return }
-            thumbnail = try? storage.load(from: path)
-        }
     }
 }

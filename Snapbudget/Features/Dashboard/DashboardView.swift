@@ -136,7 +136,6 @@ private struct RecentPurchasesGrid: View {
     let items: [ExpenseItem]
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
-    private let storage = ImageStorageService()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -145,39 +144,13 @@ private struct RecentPurchasesGrid: View {
 
             LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(items) { item in
-                    SubjectThumbnail(item: item, storage: storage)
+                    SubjectImageView(item: item)
+                        .aspectRatio(1, contentMode: .fit)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-    }
-}
-
-private struct SubjectThumbnail: View {
-    let item: ExpenseItem
-    let storage: ImageStorageService
-    @State private var image: UIImage?
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(6)
-            } else {
-                Text(item.category.emoji)
-                    .font(.title)
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .task {
-            guard let path = item.imagePath else { return }
-            image = try? storage.load(from: path)
-        }
     }
 }

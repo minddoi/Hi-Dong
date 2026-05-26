@@ -14,10 +14,10 @@ final class HistoryViewModel {
 
     init(
         repository: any ExpenseRepository,
-        storage: ImageStorageService? = nil
+        storage: ImageStorageService = .shared
     ) {
         self.repository = repository
-        self.storage = storage ?? ImageStorageService()
+        self.storage = storage
     }
 
     // MARK: - Derived
@@ -59,8 +59,9 @@ final class HistoryViewModel {
 
     func delete(_ item: ExpenseItem) async {
         // 이미지 파일 삭제 (실패해도 DB 삭제는 진행)
-        if let path = item.imagePath { try? storage.delete(at: path) }
-        if let path = item.originalImagePath { try? storage.delete(at: path) }
+        if let stored = item.storedImage {
+            await storage.delete(stored)
+        }
 
         do {
             try await repository.delete(item)

@@ -8,8 +8,15 @@ final class ExpenseItem {
     var amount: Decimal
     var category: ExpenseCategory
     var date: Date
-    var imagePath: String?        // 누끼(배경 제거) 이미지 파일 경로
-    var originalImagePath: String? // 원본 이미지 파일 경로
+
+    /// 풀 사이즈 누끼 이미지 파일명 (절대경로 X — 컨테이너 UUID 변경에 안전)
+    /// e.g. "subject_<uuid>.heic"
+    var imageFilename: String?
+
+    /// 썸네일 파일명. 리스트/그리드용 ~512px 캐시
+    /// e.g. "subject_<uuid>_thumb.heic"
+    var thumbnailFilename: String?
+
     var notes: String?
 
     init(
@@ -18,8 +25,8 @@ final class ExpenseItem {
         amount: Decimal,
         category: ExpenseCategory = .other,
         date: Date = .now,
-        imagePath: String? = nil,
-        originalImagePath: String? = nil,
+        imageFilename: String? = nil,
+        thumbnailFilename: String? = nil,
         notes: String? = nil
     ) {
         self.id = id
@@ -27,8 +34,16 @@ final class ExpenseItem {
         self.amount = amount
         self.category = category
         self.date = date
-        self.imagePath = imagePath
-        self.originalImagePath = originalImagePath
+        self.imageFilename = imageFilename
+        self.thumbnailFilename = thumbnailFilename
         self.notes = notes
+    }
+
+    // MARK: - Convenience
+
+    /// StoredImage 값 객체로 묶어서 반환 (둘 다 있을 때만)
+    var storedImage: StoredImage? {
+        guard let imageFilename, let thumbnailFilename else { return nil }
+        return StoredImage(filename: imageFilename, thumbnailFilename: thumbnailFilename)
     }
 }

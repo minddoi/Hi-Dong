@@ -27,14 +27,14 @@ final class ExpenseEntryViewModel {
     init(
         analysisResult: ImageAnalysisResult,
         repository: any ExpenseRepository,
-        storageService: ImageStorageService? = nil
+        storageService: ImageStorageService = .shared
     ) {
         self.subjectImage = analysisResult.subjectImage
         self.name = analysisResult.recognizedName
         self.category = analysisResult.suggestedCategory
         self.recognitionConfidence = analysisResult.confidence
         self.repository = repository
-        self.storageService = storageService ?? ImageStorageService()
+        self.storageService = storageService
     }
 
     // MARK: - Validation
@@ -57,19 +57,26 @@ final class ExpenseEntryViewModel {
         isSaving = true
         defer { isSaving = false }
 
-        // 누끼 이미지 파일로 저장
-        let filename = storageService.uniqueFilename(prefix: "subject")
-        let imagePath = try storageService.save(subjectImage, filename: filename)
+        // ① 누끼 이미지 저장 (풀 + 썸네일 동시 생성)
+        let stored = try await storageService.save(subjectImage)
 
+        // ② DB에 메타데이터 저장
         let item = ExpenseItem(
             name: name.trimmingCharacters(in: .whitespaces),
             amount: amount,
             category: category,
             date: .now,
-            imagePath: imagePath,
+            imageFilename: stored.filename,
+            thumbnailFilename: stored.thumbnailFilename,
             notes: notes.isEmpty ? nil : notes.trimmingCharacters(in: .whitespaces)
         )
 
-        try await repository.add(item)
+        do {
+            try await repository.add(item)
+        } catch {
+            // DB 저장 실패 시 디스크 파일 롤백 (고아 파일 방지)
+            await storageService.delete(stored)
+            throw error
+        }
     }
 }
