@@ -5,7 +5,8 @@ struct ExpenseEntryView: View {
     @Environment(\.modelContext) private var modelContext
 
     let analysisResult: ImageAnalysisResult
-    let onSaved: () -> Void   // 저장 완료 후 호출 (sheet dismiss + CaptureView dismiss)
+    let pastHint: PastPurchaseHint?
+    let onSaved: () -> Void
 
     @State private var viewModel: ExpenseEntryViewModel?
     @FocusState private var focusedField: Field?
@@ -23,7 +24,11 @@ struct ExpenseEntryView: View {
         .onAppear {
             guard viewModel == nil else { return }
             let repo = SwiftDataExpenseRepository(modelContext: modelContext)
-            viewModel = ExpenseEntryViewModel(analysisResult: analysisResult, repository: repo)
+            viewModel = ExpenseEntryViewModel(
+                analysisResult: analysisResult,
+                pastHint: pastHint,
+                repository: repo
+            )
         }
     }
 
@@ -33,6 +38,11 @@ struct ExpenseEntryView: View {
     private func formContent(_ vm: ExpenseEntryViewModel) -> some View {
         NavigationStack {
             Form {
+                // ⭐️ 매칭된 과거 구매가 있으면 상단에 배너
+                if let hint = vm.pastHint {
+                    pastPurchaseBanner(hint)
+                }
+
                 // ── 누끼 이미지 미리보기 ──────────────────
                 Section {
                     HStack {
@@ -58,8 +68,8 @@ struct ExpenseEntryView: View {
                         .submitLabel(.next)
                         .onSubmit { focusedField = .amount }
 
-                        // 인식 신뢰도가 낮으면 힌트 표시
-                        if vm.recognitionConfidence < 0.5 {
+                        // 인식 신뢰도가 낮으면 힌트 (과거 매칭이 있으면 표시 안 함)
+                        if vm.pastHint == nil && vm.recognitionConfidence < 0.5 {
                             Image(systemName: "pencil.circle")
                                 .foregroundStyle(.orange)
                                 .accessibilityLabel("이름을 확인해 주세요")
@@ -100,17 +110,17 @@ struct ExpenseEntryView: View {
                     Text("메모")
                 }
             }
-            .navigationTitle("지출 기록")
+            .navigationTitle(vm.pastHint == nil ? "지출 기록" : "다시 구매")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("취소") { onSaved() } // onSaved로 통합 처리
+                    Button("취소") { onSaved() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if vm.isSaving {
                         ProgressView()
                     } else {
-                        Button("저장") {
+                        Button(vm.isOneTapSaveMode ? "바로 저장" : "저장") {
                             Task {
                                 do {
                                     try await vm.save()
@@ -134,5 +144,39 @@ struct ExpenseEntryView: View {
                 Text(vm.saveError?.localizedDescription ?? "")
             }
         }
+    }
+
+    // MARK: - Past Purchase Banner
+
+    private func pastPurchaseBanner(_ hint: PastPurchaseHint) -> some View {
+        Section {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("전에 산 물건 같아요")
+                        .font(.subheadline.weight(.semibold))
+                    Text("\(hint.name) · \(hint.amount, format: .currency(code: "KRW")) · \(relativeDate(hint.purchaseDate))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("\(hint.similarityPercent)%")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.tint.opacity(0.15), in: Capsule())
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func relativeDate(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: .now)
     }
 }

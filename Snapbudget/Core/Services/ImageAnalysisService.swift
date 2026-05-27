@@ -26,6 +26,7 @@ struct ImageAnalysisResult: Sendable {
     let recognizedName: String     // 인식된 물건명
     let confidence: Float          // 인식 신뢰도 (0.0 ~ 1.0)
     let suggestedCategory: ExpenseCategory
+    let imageEmbedding: Data?      // VNFeaturePrintObservation 직렬화 (반복 구매 매칭용)
 }
 
 // MARK: - Service
@@ -35,19 +36,60 @@ final class ImageAnalysisService: Sendable {
 
     // MARK: - Public Interface
 
-    /// 배경 제거 + 물건 인식을 동시에 수행
+    /// 배경 제거 + 물건 인식 + 임베딩 추출을 동시에 수행 (3개 작업 병렬)
     func analyze(_ image: UIImage) async throws -> ImageAnalysisResult {
         async let subjectImage = removeBackground(from: image)
         async let classification = classifyImage(image)
+        async let embedding = extractFeaturePrint(image)  // 실패해도 nil 반환 → 매칭만 안 됨
 
-        let (subject, (name, confidence, category)) = try await (subjectImage, classification)
+        let (subject, (name, confidence, category), embeddingData) = try await (
+            subjectImage,
+            classification,
+            embedding
+        )
 
         return ImageAnalysisResult(
             subjectImage: subject,
             recognizedName: name,
             confidence: confidence,
-            suggestedCategory: category
+            suggestedCategory: category,
+            imageEmbedding: embeddingData
         )
+    }
+
+    // MARK: - Feature Print (Embedding)
+
+    /// 이미지에서 768차원 특징 벡터 추출 (NSKeyedArchiver로 직렬화한 Data 반환)
+    /// - 실패 시 throw하지 않고 nil 반환 (매칭은 옵셔널 기능이므로 분석 자체는 계속 진행)
+    func extractFeaturePrint(_ image: UIImage) async -> Data? {
+        guard let cgImage = image.cgImage else { return nil }
+
+        return await withCheckedContinuation { continuation in
+            let request = VNGenerateImageFeaturePrintRequest { request, error in
+                guard
+                    error == nil,
+                    let observation = request.results?.first as? VNFeaturePrintObservation
+                else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                // VNFeaturePrintObservation을 NSKeyedArchiver로 직렬화
+                let data = try? NSKeyedArchiver.archivedData(
+                    withRootObject: observation,
+                    requiringSecureCoding: true
+                )
+                continuation.resume(returning: data)
+            }
+            request.imageCropAndScaleOption = .scaleFill
+
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+            } catch {
+                continuation.resume(returning: nil)
+            }
+        }
     }
 
     // MARK: - Background Removal

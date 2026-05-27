@@ -17,6 +17,10 @@ final class ExpenseItem {
     /// e.g. "subject_<uuid>_thumb.heic"
     var thumbnailFilename: String?
 
+    /// Vision Feature Print (768차원 벡터, NSKeyedArchiver로 직렬화)
+    /// 과거 구매와의 이미지 유사도 비교에 사용 (반복 구매 자동 감지)
+    var imageEmbedding: Data?
+
     var notes: String?
 
     init(
@@ -27,6 +31,7 @@ final class ExpenseItem {
         date: Date = .now,
         imageFilename: String? = nil,
         thumbnailFilename: String? = nil,
+        imageEmbedding: Data? = nil,
         notes: String? = nil
     ) {
         self.id = id
@@ -36,6 +41,7 @@ final class ExpenseItem {
         self.date = date
         self.imageFilename = imageFilename
         self.thumbnailFilename = thumbnailFilename
+        self.imageEmbedding = imageEmbedding
         self.notes = notes
     }
 

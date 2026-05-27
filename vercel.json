@@ -1,0 +1,3 @@
+{
+  "ignoreCommand": "echo 'iOS Swift 프로젝트 브랜치 — 웹 배포 대상이 아니므로 빌드 스킵' && exit 0"
+}
